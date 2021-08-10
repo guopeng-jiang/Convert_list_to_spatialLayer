@@ -1,4 +1,4 @@
-# text_mining-Convert_list_to_spatialLayer
+# Convert_list_to_spatialLayer
 text mining
 
 Working for Hawkes Bay Regional Council on the Farm Environmental Management Plan (FEMP) project.
