@@ -1,3 +1,5 @@
+library(stringr)
+
 ########### Query parcels based on name search ############
 
 name_match = function(keyword, target_field){
