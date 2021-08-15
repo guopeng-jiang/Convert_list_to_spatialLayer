@@ -7,6 +7,7 @@ library(plotly)
 library(htmltools)
 library(DT)
 library(shinyjs)
+library(sf)
 
 # Define UI for dataset viewer app ----
 ui <- fluidPage(
@@ -30,6 +31,13 @@ ui <- fluidPage(
                  
                  # ----
                  
+                 fileInput(
+                   inputId = "filemap",
+                   label = "Upload Property_Title. Choose shapefile (shp.)",
+                   multiple = F,
+                   accept = c(".shp")
+                 ),
+                 
                  actionButton("GoButton","Let's GO!"),
                  downloadButton("downloadData", "Download")
                  
@@ -47,6 +55,8 @@ ui <- fluidPage(
 
 # Define server logic to summarize and view selected dataset ----
 server <- function(input, output, session) {
+  
+  options(shiny.maxRequestSize=30*1024^2) # increase the maximum upload size to 30MB
   
   dfile = reactiveValues() #create an empty list of reactive values which you'll populate as you go
   
@@ -70,6 +80,40 @@ server <- function(input, output, session) {
                  }
                  updateSelectInput(session, "variable", "Variable:", choices = colnames(dfile$sel))
                })
+  
+  
+  map <- reactive({
+    
+    req(input$filemap)
+    
+    # shpdf is a data.frame with the name, size, type and datapath of the uploaded files
+    shpdf <- input$filemap
+    
+    # The files are uploaded with names
+    # 0.dbf, 1.prj, 2.shp, 3.xml, 4.shx
+    # (path/names are in column datapath)
+    # We need to rename the files with the actual names:
+    # fe_2007_39_county.dbf, etc.
+    # (these are in column name)
+    
+    # Name of the temporary directory where files are uploaded
+    tempdirname <- dirname(shpdf$datapath[1])
+
+    # Rename files
+    for (i in 1:nrow(shpdf)) {
+      file.rename(
+        shpdf$datapath[i],
+        paste0(tempdirname, "/", shpdf$name[i])
+      )
+    }
+
+    # Now we read the shapefile with read_sf() of rgdal package
+
+    AllProperty = read_sf(tempdirname, crs =2193) %>% st_transform(4326)
+    AllProperty
+  })
+  
+  
   
   # ----- 
 
@@ -97,9 +141,7 @@ server <- function(input, output, session) {
     library(rgeos)
     library(tidyverse)
     library(tm)
-    library(sf)
-    
-    AllProperty = read_sf("N:/Gorden_Jiang/Tukituki_LUC/ALLproperties.shp", crs =2193) %>% st_transform(4326)
+
     keyword = iconv(enc2utf8(pull(dfile$sel[input$variable])))
     
     target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm"))
@@ -122,8 +164,8 @@ server <- function(input, output, session) {
       })
 
     output$downloadData <- downloadHandler(
-      filename = function() { dfile$dd[dfile$id] }, 
-      content = function(file) {writeOGR(target_parcels, file, driver="ESRI Shapefile")})
+      filename = "target_parcels", 
+      content = function(file) { st_write(target_parcels, "target_parcels.shp", driver="ESRI Shapefile") })
     
   })
   
