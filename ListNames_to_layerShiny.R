@@ -164,8 +164,8 @@ server <- function(input, output, session) {
       })
 
     output$downloadData <- downloadHandler(
-      filename = "target_parcels", 
-      content = function(file) { st_write(target_parcels, "target_parcels.shp", driver="ESRI Shapefile") })
+      filename = function() {dfile$dd[dfile$id]}, 
+      content = function(file) { st_write(target_parcels, file, driver="ESRI Shapefile") })
     
   })
   
