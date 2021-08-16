@@ -9,6 +9,7 @@ library(DT)
 library(shinyjs)
 library(sf)
 
+library(mapview)
 library(sp)
 library(rgdal)
 library(rgeos)
