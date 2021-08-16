@@ -9,6 +9,12 @@ library(DT)
 library(shinyjs)
 library(sf)
 
+library(sp)
+library(rgdal)
+library(rgeos)
+library(tidyverse)
+library(tm)
+
 # Define UI for dataset viewer app ----
 ui <- fluidPage(
   
@@ -31,12 +37,9 @@ ui <- fluidPage(
                  
                  # ----
                  
-                 fileInput(
-                   inputId = "filemap",
-                   label = "Upload Property_Title. Choose shapefile (shp.)",
-                   multiple = F,
-                   accept = c(".shp")
-                 ),
+                 fileInput("filemap", "Please upload Property_Title. This program accepts .shp, .dbf, .sbn, .sbx, .shx, .prj", 
+                           accept=c('.shp','.dbf','.sbn','.sbx','.shx',".prj"), 
+                           multiple=TRUE),
                  
                  actionButton("GoButton","Let's GO!"),
                  downloadButton("downloadData", "Download")
@@ -46,7 +49,7 @@ ui <- fluidPage(
     
     # Main panel for displaying outputs ----
     mainPanel("Output result panel", 
-              leafletOutput("View")
+              mapviewOutput("View")
     )
     
   )
@@ -81,42 +84,27 @@ server <- function(input, output, session) {
                  updateSelectInput(session, "variable", "Variable:", choices = colnames(dfile$sel))
                })
   
-  
-  map <- reactive({
+  mapfile <- reactive({
     
-    req(input$filemap)
-    
-    # shpdf is a data.frame with the name, size, type and datapath of the uploaded files
     shpdf <- input$filemap
-    
-    # The files are uploaded with names
-    # 0.dbf, 1.prj, 2.shp, 3.xml, 4.shx
-    # (path/names are in column datapath)
-    # We need to rename the files with the actual names:
-    # fe_2007_39_county.dbf, etc.
-    # (these are in column name)
-    
-    # Name of the temporary directory where files are uploaded
-    tempdirname <- dirname(shpdf$datapath[1])
-
-    # Rename files
-    for (i in 1:nrow(shpdf)) {
-      file.rename(
-        shpdf$datapath[i],
-        paste0(tempdirname, "/", shpdf$name[i])
-      )
+    if(is.null(shpdf)){
+      return()
     }
-
-    # Now we read the shapefile with read_sf() of rgdal package
-
-    AllProperty = read_sf(tempdirname, crs =2193) %>% st_transform(4326)
-    AllProperty
+    previouswd <- getwd()
+    uploaddirectory <- dirname(shpdf$datapath[1])
+    setwd(uploaddirectory)
+    for(i in 1:nrow(shpdf)){
+      file.rename(shpdf$datapath[i], shpdf$name[i])
+    }
+    setwd(previouswd)
+    
+    map <- readOGR(paste(uploaddirectory, shpdf$name[grep(pattern="*.shp$", shpdf$name)], sep="/"))#,  delete_null_obj=TRUE)
+    map <- spTransform(map, CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+    
   })
   
-  
-  
   # ----- 
-
+  
   # Return the requested dataset ----
   observeEvent(input$GoButton,{
     
@@ -136,13 +124,9 @@ server <- function(input, output, session) {
       
     }
     
-    library(sp)
-    library(rgdal)
-    library(rgeos)
-    library(tidyverse)
-    library(tm)
-
     keyword = iconv(enc2utf8(pull(dfile$sel[input$variable])))
+    
+    AllProperty = mapfile()
     
     target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm"))
     # problem with company names, initials, symbols
@@ -150,19 +134,15 @@ server <- function(input, output, session) {
     random = lapply(keyword, function(keyword){which(mapply(name_match, keyword, strsplit(target_field, ", ") ) == TRUE)} )
     
     target_parcels = AllProperty[unlist(random),]
-    target_parcels = target_parcels[target_parcels$Hectares >= 10, ]
     
-    output$View <- renderLeaflet({ 
+#    target_parcels = target_parcels[target_parcels$Hectares >= 10, ]
+    
+    output$View <- renderMapview({ 
       
-      labels <- sprintf(
-        "<strong>%s</strong><br/>",
-        paste(target_parcels$title_no, "--", target_parcels$owners, sep='')
-      ) %>% lapply(htmltools::HTML)
+      mapview(target_parcels)
       
-      m <- leaflet() %>% addTiles() %>% addPolygons(data = target_parcels, weight = 1, label = labels)
-      
-      })
-
+    })
+    
     output$downloadData <- downloadHandler(
       filename = function() {dfile$dd[dfile$id]}, 
       content = function(file) { st_write(target_parcels, file, driver="ESRI Shapefile") })
@@ -173,4 +153,3 @@ server <- function(input, output, session) {
 
 # Create Shiny app ----
 shinyApp(ui = ui, server = server)
-
