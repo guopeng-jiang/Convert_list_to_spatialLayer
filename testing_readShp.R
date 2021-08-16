@@ -14,6 +14,7 @@ library(rgdal)
 library(rgeos)
 library(tidyverse)
 library(tm)
+library(mapview)
 
 # Define UI for dataset viewer app ----
 ui <- fluidPage(
@@ -29,12 +30,7 @@ ui <- fluidPage(
                  
                  # ----
                  
-                 fileInput(
-                   inputId = "filemap",
-                   label = "Upload Property_Title. Choose shapefile (shp.)",
-                   multiple = F,
-                   accept = c(".shp")
-                 ),
+                 fileInput("filemap", "", accept=c('.shp','.dbf','.sbn','.sbx','.shx',".prj"), multiple=TRUE),
                  
                  actionButton("GoButton","Let's GO!"),
                  
@@ -43,7 +39,7 @@ ui <- fluidPage(
     
     # Main panel for displaying outputs ----
     mainPanel("Output result panel", 
-              leafletOutput("View")
+              mapviewOutput("View")
     )
     
   )
@@ -57,27 +53,22 @@ server <- function(input, output, session) {
   
   mapfile <- reactive({
     
-    req(input$filemap)
-    
-    # shpdf is a data.frame with the name, size, type and datapath of the uploaded files
     shpdf <- input$filemap
-    
-    # Name of the temporary directory where files are uploaded
-    tempdirname <- dirname(shpdf$datapath[1])
-    
-    # Rename files
-    for (i in 1:nrow(shpdf)) {
-      file.rename(
-        shpdf$datapath[i],
-        paste0(tempdirname, "/", shpdf$name[i])
-      )
+    if(is.null(shpdf)){
+      return()
     }
+    previouswd <- getwd()
+    uploaddirectory <- dirname(shpdf$datapath[1])
+    setwd(uploaddirectory)
+    for(i in 1:nrow(shpdf)){
+      file.rename(shpdf$datapath[i], shpdf$name[i])
+    }
+    setwd(previouswd)
     
-    # Now we read the shapefile with read_sf() of rgdal package
+    map <- readOGR(paste(uploaddirectory, shpdf$name[grep(pattern="*.shp$", shpdf$name)], sep="/"))#,  delete_null_obj=TRUE)
+    map <- spTransform(map, CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
     
-    mapfile = read_sf(tempdirname, crs =2193) %>% st_transform(4326)
-    mapfile
-  })
+    })
   
   # ----- 
   
@@ -86,14 +77,9 @@ server <- function(input, output, session) {
     
     target_parcels = mapfile()
     
-    output$View <- renderLeaflet({ 
+    output$View <- renderMapview({ 
       
-      labels <- sprintf(
-        "<strong>%s</strong><br/>",
-        paste(target_parcels$title_no, "--", target_parcels$owners, sep='')
-      ) %>% lapply(htmltools::HTML)
-      
-      m <- leaflet() %>% addTiles() %>% addPolygons(data = target_parcels, weight = 1, label = labels)
+      mapview(target_parcels)
       
     })
     
