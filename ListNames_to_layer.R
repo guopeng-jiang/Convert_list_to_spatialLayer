@@ -28,7 +28,7 @@ AllProperty = readOGR(dsn = "N:/Gorden_Jiang/Tukituki_LUC", layer = "ALLproperti
 
 keyword = readxl::read_excel("N:/FEMP - 2021 - M+G/Correspondence/June 2021 letter - 275 addresses/Follow up letter addresses - 30.6.21.xlsx", 
                              sheet = "All properties") %>% select(`Owners Name`) %>% pull()
-target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm"))
+target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm", "Incorporated"))
 # problem with company names, initials, symbols
 
 random = lapply(keyword, function(keyword){which(mapply(name_match, keyword, strsplit(target_field, ", ") ) == TRUE)} )
