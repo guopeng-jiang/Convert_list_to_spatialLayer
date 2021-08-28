@@ -20,7 +20,7 @@ library(tm)
 ui <- fluidPage(
   
   # App title ----
-  titlePanel("Turning a list of names into spatial polygons"),
+  titlePanel("Query a list of properties from property title using owners' names"),
   
   # Sidebar layout with a input and output definitions ----
   sidebarLayout(
@@ -31,14 +31,14 @@ ui <- fluidPage(
                  # Input: Selector for choosing dataset ----
                  fileInput("file1", "Please upload data file (xlsx or csv)", accept = c(".xlsx", ".csv"), multiple=F), # Kathy
                  
-                 selectInput("dataset","Data:", choices = "Files uploaded"), #Kathy
-                 selectInput("variable","Variable:", choices = NULL),
+                 selectInput("dataset","Data Sheet Uploaded:", choices = "Files uploaded"), #Kathy
+                 selectInput("variable","Owners Name Column:", choices = NULL),
                  
                  tags$hr(style="border-color: Orange;"),
                  
                  # ----
                  
-                 fileInput("filemap", "Please upload Property_Title. This program accepts .shp, .dbf, .sbn, .sbx, .shx, .prj", 
+                 fileInput("filemap", "Please upload Property_Title including .shp, .dbf, .sbn, .sbx, .shx, .prj", 
                            accept=c('.shp','.dbf','.sbn','.sbx','.shx',".prj"), 
                            multiple=TRUE),
                  
@@ -69,7 +69,7 @@ server <- function(input, output, session) {
   observeEvent(input$file1,{
     dfile$dd<-input$file1$datapath
     dfile$df<-input$file1$name
-    updateSelectInput(session, "dataset", "Data:", choices = dfile$df)
+    updateSelectInput(session, "dataset", "Data Sheet Uploaded:", choices = dfile$df)
   })
   
   #update the variable list based on the dataset chosen and assign the contents of the file to a reactive value
@@ -82,7 +82,7 @@ server <- function(input, output, session) {
                  } else {
                    dfile$sel<-readr::read_csv(dfile$dd[dfile$id]) # check the extension, if csv. then {csv} else {excel}
                  }
-                 updateSelectInput(session, "variable", "Variable:", choices = colnames(dfile$sel))
+                 updateSelectInput(session, "variable", "Owners Name Column:", choices = colnames(dfile$sel))
                })
   
   mapfile <- reactive({
@@ -129,7 +129,7 @@ server <- function(input, output, session) {
     
     AllProperty = mapfile()
     
-    target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm"))
+    target_field = removeWords(AllProperty$owners, c(LETTERS, " & ", " + ", "Limited", "Station", "Trust", "Trustee", "Family", "Farm", "Incorporated"))
     # problem with company names, initials, symbols
     
     random = lapply(keyword, function(keyword){which(mapply(name_match, keyword, strsplit(target_field, ", ") ) == TRUE)} )
